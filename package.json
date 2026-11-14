@@ -98,7 +98,7 @@
     }
   },
   "scripts": {
-    "test": "node --test test/unit/",
+    "test": "node --test test/unit/*.test.js",
     "test:e2e": "node test/e2e/run.js",
     "package": "vsce package --no-dependencies --skip-license"
   },
