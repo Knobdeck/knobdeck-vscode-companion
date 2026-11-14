@@ -8,6 +8,7 @@ const assert = require('assert/strict');
 const fs = require('fs');
 const http = require('http');
 const path = require('path');
+const { pathToFileURL } = require('url');
 const vscode = require('vscode');
 
 const PORT = 32145;
@@ -59,7 +60,7 @@ const PLUGIN = process.env.KNOBDECK_VSCODE_PLUGIN;
 
 test('KnobDeck plugin: simple actions', async () => {
   if (!PLUGIN) return 'skipped (no KNOBDECK_VSCODE_PLUGIN)';
-  const { PluginDriver } = await import(path.resolve(__dirname, '../../../compat/driver.mjs'));
+  const { PluginDriver } = await import(pathToFileURL(path.resolve(__dirname, '../../../compat/driver.mjs')).href);
   const plugin = await PluginDriver.start(PLUGIN, { VSCODE_PORT: String(PORT) });
   try {
     for (const id of ['explorer', 'search', 'source-control', 'problems', 'toggle-panel', 'toggle-panel', 'save-all', 'split-editor', 'new-terminal']) {
@@ -70,7 +71,9 @@ test('KnobDeck plugin: simple actions', async () => {
     assert.deepEqual((await plugin.invoke('run-task', { taskName: 'kd-touch' })).errors, []);
     await until('task marker', () => fs.existsSync(marker('task.marker')));
 
-    // Task Wheel lists it, and pressing the child runs it again.
+    // Task Wheel lists it, and pressing the child runs it again (once the first run has ended:
+    // VS Code won't start a task that is still running).
+    await until('first task run to end', () => !vscode.tasks.taskExecutions.some((e) => e.task.name === 'kd-touch'));
     fs.rmSync(marker('task.marker'));
     const wheel = await plugin.request('wheel', { action_id: 'task-wheel', inputs: {} });
     assert.ok(wheel.slices.some((s) => s.id === 'kd-touch'));
