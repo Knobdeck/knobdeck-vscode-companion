@@ -1,0 +1,12 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "kd-touch",
+      "type": "process",
+      "command": "node",
+      "args": ["-e", "require('fs').writeFileSync(process.argv[1], 'task')", "${workspaceFolder}/out/task.marker"],
+      "problemMatcher": []
+    }
+  ]
+}

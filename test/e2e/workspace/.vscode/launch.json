@@ -1,0 +1,12 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "kd-debug",
+      "type": "node",
+      "request": "launch",
+      "program": "${workspaceFolder}/debug-target.js",
+      "console": "internalConsole"
+    }
+  ]
+}

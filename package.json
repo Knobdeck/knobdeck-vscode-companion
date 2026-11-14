@@ -1,0 +1,110 @@
+{
+  "name": "knobdeck-vscode-companion",
+  "displayName": "KnobDeck VS Code Companion",
+  "description": "Lets the KnobDeck dial and deck control VS Code: run tasks, start debugging, switch editors and terminals, and run any command.",
+  "version": "1.0.0",
+  "publisher": "knobdeck",
+  "author": "Harshal Kudale",
+  "icon": "media/icon.png",
+  "galleryBanner": {
+    "color": "#12161A",
+    "theme": "dark"
+  },
+  "homepage": "https://knobdeck.harshalkudale.com",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/HarshalKudale/knobdeck-companion.git",
+    "directory": "vscode"
+  },
+  "bugs": {
+    "url": "https://github.com/HarshalKudale/knobdeck-companion/issues"
+  },
+  "keywords": [
+    "knobdeck",
+    "stream deck",
+    "macro pad",
+    "dial",
+    "shortcuts"
+  ],
+  "engines": {
+    "vscode": "^1.90.0"
+  },
+  "categories": [
+    "Other"
+  ],
+  "extensionKind": [
+    "ui"
+  ],
+  "capabilities": {
+    "untrustedWorkspaces": {
+      "supported": true
+    },
+    "virtualWorkspaces": true
+  },
+  "activationEvents": [
+    "onStartupFinished"
+  ],
+  "main": "./src/extension.js",
+  "contributes": {
+    "commands": [
+      {
+        "command": "knobdeck.startServer",
+        "title": "Connect This Window to KnobDeck",
+        "category": "KnobDeck"
+      },
+      {
+        "command": "knobdeck.stopServer",
+        "title": "Stop the Action Server",
+        "category": "KnobDeck"
+      },
+      {
+        "command": "knobdeck.showStatus",
+        "title": "Show Connection Status",
+        "category": "KnobDeck"
+      },
+      {
+        "command": "knobdeck.browseCommands",
+        "title": "Copy a Command ID",
+        "category": "KnobDeck"
+      }
+    ],
+    "configuration": {
+      "title": "KnobDeck VS Code Companion",
+      "properties": {
+        "knobdeck.port": {
+          "type": "integer",
+          "default": 32145,
+          "minimum": 1,
+          "maximum": 65535,
+          "scope": "application",
+          "order": 0,
+          "markdownDescription": "Port of the local action server (on `127.0.0.1` only). Use the same port in KnobDeck's VS Code plugin setup."
+        },
+        "knobdeck.password": {
+          "type": "string",
+          "default": "",
+          "scope": "application",
+          "order": 1,
+          "markdownDescription": "Optional password. When set, KnobDeck must send the same password; enter it in KnobDeck's VS Code plugin setup."
+        },
+        "knobdeck.autostart": {
+          "type": "boolean",
+          "default": true,
+          "scope": "application",
+          "order": 2,
+          "description": "Start the action server when VS Code starts."
+        }
+      }
+    }
+  },
+  "scripts": {
+    "test": "node --test test/unit/",
+    "test:e2e": "node test/e2e/run.js",
+    "package": "vsce package --no-dependencies --skip-license"
+  },
+  "devDependencies": {
+    "@vscode/test-electron": "3.1.0",
+    "@vscode/vsce": "4.1.1",
+    "ovsx": "1.4.0"
+  }
+}
