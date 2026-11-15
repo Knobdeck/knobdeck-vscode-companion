@@ -59,4 +59,4 @@ can't drive your editor. See the [KnobDeck privacy policy](https://knobdeck.hars
 - **KnobDeck: Copy a Command ID**
 
 The HTTP interface is documented in
-[PROTOCOL.md](https://github.com/HarshalKudale/knobdeck-companion/blob/master/PROTOCOL.md).
+[PROTOCOL.md](https://github.com/Knobdeck/knobdeck-companion/blob/master/PROTOCOL.md).

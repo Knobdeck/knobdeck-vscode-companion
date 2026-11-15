@@ -13,11 +13,11 @@
   "homepage": "https://knobdeck.harshalkudale.com",
   "repository": {
     "type": "git",
-    "url": "https://github.com/HarshalKudale/knobdeck-companion.git",
+    "url": "https://github.com/Knobdeck/knobdeck-companion.git",
     "directory": "vscode"
   },
   "bugs": {
-    "url": "https://github.com/HarshalKudale/knobdeck-companion/issues"
+    "url": "https://github.com/Knobdeck/knobdeck-companion/issues"
   },
   "keywords": [
     "knobdeck",
