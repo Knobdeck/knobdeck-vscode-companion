@@ -24,11 +24,12 @@ them in both test runs. CI does this on Linux and Windows (and macOS on pull req
 
 ## Releasing
 
-1. Bump `version` in `package.json` and add a `CHANGELOG.md` entry.
-2. Merge to `master`, then tag and push: `git tag v1.2.3 && git push origin v1.2.3`.
+1. Bump `version` in `package.json` and add a `CHANGELOG.md` entry. Merge to `master`.
+2. **Actions → Release → Run workflow** on `master`.
 
-`.github/workflows/release.yml` runs the tests, packages the `.vsix`, publishes it to the Visual
-Studio Marketplace and Open VSX, and creates a GitHub release with it.
+`.github/workflows/release.yml` runs the tests (Linux and Windows), packages the `.vsix`, creates
+the tag `v<version>` and a GitHub release with it, then publishes it to the Visual Studio
+Marketplace and Open VSX. Re-running it for a released version only retries the stores.
 
 Publishing uses **Trusted Publishing** (GitHub OIDC); the repo holds no store tokens. Both stores
 have a policy trusting `Knobdeck/knobdeck-vscode-companion`, workflow `release.yml`, environment

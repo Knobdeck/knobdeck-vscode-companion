@@ -1,25 +1,59 @@
-# Push a tag v<version> (matching package.json) to test, build and publish a release.
+# Actions → Release → Run workflow (on master) releases the version in package.json: it runs CI,
+# creates the tag v<version> and a GitHub release with the .vsix, then publishes it to the Visual
+# Studio Marketplace and Open VSX. Re-running for a version that already has a release skips the
+# release and only retries the stores (both skip a version they already have).
 #
 # Publishing uses Trusted Publishing (OIDC): no store tokens are stored in this repo. Both stores
 # trust this file by name (release.yml) in the `release` environment, so keep the two in step
-# with the policies on marketplace.visualstudio.com/manage and open-vsx.org.
+# with the policies on marketplace.visualstudio.com/manage and open-vsx.org. The store jobs must
+# stay in this file (not a reusable workflow) for the same reason.
 name: Release
 
 on:
-  push:
-    tags: ["v*"]
+  workflow_dispatch:
+
+concurrency: release
 
 jobs:
   ci:
+    if: github.ref == 'refs/heads/master'
     uses: ./.github/workflows/ci.yml
 
-  publish:
+  release:
     needs: ci
     runs-on: ubuntu-latest
     environment: release
     permissions:
-      contents: write # GitHub release
-      id-token: write # OIDC token for the Marketplace and Open VSX
+      contents: write # tag and GitHub release
+    steps:
+      - uses: actions/checkout@v4
+      - id: version
+        run: echo "version=$(node -p 'require("./package.json").version')" >> "$GITHUB_OUTPUT"
+      - uses: actions/download-artifact@v4
+        with:
+          name: knobdeck-vscode-companion
+      - name: Tag and GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          tag="v$VERSION"
+          if gh release view "$tag" >/dev/null 2>&1; then
+            test "$(gh api "repos/$GITHUB_REPOSITORY/commits/$tag" --jq .sha)" = "$GITHUB_SHA" \
+              || { echo "::error::$tag already exists on another commit: bump the version in package.json"; exit 1; }
+            echo "::notice::$tag is already released; publishing to the stores only"
+            exit 0
+          fi
+          awk '/^## /{n++} n==1' CHANGELOG.md | tail -n +2 > notes.md
+          gh release create "$tag" knobdeck-vscode-companion.vsix --target "$GITHUB_SHA" \
+            --title "KnobDeck VS Code Companion $VERSION" --notes-file notes.md
+
+  marketplace:
+    needs: release
+    runs-on: ubuntu-latest
+    environment: release
+    permissions:
+      id-token: write # OIDC token for the Marketplace
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -27,29 +61,27 @@ jobs:
           node-version: 22
           cache: npm
       - run: npm ci
-      - name: Check the tag matches package.json
-        run: test "v$(node -p 'require("./package.json").version')" = "$GITHUB_REF_NAME"
       - uses: actions/download-artifact@v4
         with:
           name: knobdeck-vscode-companion
       - name: Visual Studio Marketplace
         run: npx vsce publish --oidc --skip-duplicate --packagePath knobdeck-vscode-companion.vsix
+
+  open-vsx:
+    needs: release
+    runs-on: ubuntu-latest
+    environment: release
+    permissions:
+      id-token: write # OIDC token for Open VSX
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - uses: actions/download-artifact@v4
+        with:
+          name: knobdeck-vscode-companion
       - name: Open VSX
-        # Open VSX trusts this workflow only once the extension has one version there, so the very
-        # first upload needs a token: set the OVSX_PAT secret for that, then delete it.
-        env:
-          OVSX_PAT: ${{ secrets.OVSX_PAT }}
-        run: |
-          if [ -n "$OVSX_PAT" ]; then
-            npx ovsx publish knobdeck-vscode-companion.vsix --skip-duplicate
-          else
-            unset OVSX_PAT
-            npx ovsx publish knobdeck-vscode-companion.vsix --skip-duplicate --trusted-publishing
-          fi
-      - name: GitHub release
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          awk '/^## /{n++} n==1' CHANGELOG.md | tail -n +2 > notes.md
-          gh release create "$GITHUB_REF_NAME" knobdeck-vscode-companion.vsix \
-            --title "KnobDeck VS Code Companion ${GITHUB_REF_NAME#v}" --notes-file notes.md
+        run: npx ovsx publish knobdeck-vscode-companion.vsix --skip-duplicate --trusted-publishing
