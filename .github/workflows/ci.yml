@@ -17,9 +17,10 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        # macOS runners often queue for a long time, and macOS behaves like Linux here, so only
-        # a manual run (Actions → CI → Run workflow) adds it.
-        os: ${{ fromJSON(github.event_name == 'workflow_dispatch' && '["ubuntu-latest", "windows-latest", "macos-latest"]' || '["ubuntu-latest", "windows-latest"]') }}
+        # macOS runners often queue for a long time, so macOS runs only on pull requests and on a
+        # manual CI run (Actions → CI → Run workflow), never in a release. Inside a release this
+        # workflow sees the Release run's event (workflow_dispatch), hence the workflow-name check.
+        os: ${{ fromJSON((github.event_name == 'pull_request' || (github.event_name == 'workflow_dispatch' && github.workflow == 'CI')) && '["ubuntu-latest", "windows-latest", "macos-latest"]' || '["ubuntu-latest", "windows-latest"]') }}
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4

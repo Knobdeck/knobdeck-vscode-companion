@@ -18,7 +18,7 @@ npx vsce package
 
 Point `KNOBDECK_VSCODE_PLUGIN` / `KNOBDECK_VSCODE_SETUP` at a built `vscode` / `vscode-setup` from
 [knobdeck-plugins](https://github.com/Knobdeck/knobdeck-plugins) (`cargo build -p vscode`) to drive
-them in both test runs. CI does this on Linux and Windows (macOS too when run by hand).
+them in both test runs. CI does this on Linux and Windows (and macOS on pull requests and manual CI runs; releases skip macOS).
 
 `test/compat/driver.mjs` is a copy of `compat/driver.mjs` in knobdeck-companion; keep them in step.
 
