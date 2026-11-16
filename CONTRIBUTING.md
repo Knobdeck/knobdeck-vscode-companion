@@ -18,7 +18,7 @@ npx vsce package --skip-license
 
 Point `KNOBDECK_VSCODE_PLUGIN` / `KNOBDECK_VSCODE_SETUP` at a built `vscode` / `vscode-setup` from
 [knobdeck-plugins](https://github.com/Knobdeck/knobdeck-plugins) (`cargo build -p vscode`) to drive
-them in both test runs. CI does this on Linux, Windows and macOS.
+them in both test runs. CI does this on Linux and Windows (macOS too when run by hand).
 
 `test/compat/driver.mjs` is a copy of `compat/driver.mjs` in knobdeck-companion; keep them in step.
 
