@@ -152,7 +152,7 @@ const SETUP = process.env.KNOBDECK_VSCODE_SETUP;
 
 test('KnobDeck vscode plugin drives the companion', { skip: !PLUGIN && 'set KNOBDECK_VSCODE_PLUGIN' }, async () => {
   password = 'pw 1';
-  const { PluginDriver } = await import(require('url').pathToFileURL(require('path').resolve(__dirname, '../../../compat/driver.mjs')).href);
+  const { PluginDriver } = await import(require('url').pathToFileURL(require('path').resolve(__dirname, '../compat/driver.mjs')).href);
   const plugin = await PluginDriver.start(PLUGIN, { VSCODE_HOST: '127.0.0.1', VSCODE_PORT: String(port), VSCODE_PASSWORD: password });
   try {
     for (const id of ['command-palette', 'save-all', 'format-document', 'stop-debugging']) {
@@ -187,7 +187,7 @@ test('KnobDeck vscode plugin drives the companion', { skip: !PLUGIN && 'set KNOB
 
 test('KnobDeck vscode setup verifies the companion', { skip: !SETUP && 'set KNOBDECK_VSCODE_SETUP' }, async () => {
   password = 'pw';
-  const { runSetup } = await import(require('url').pathToFileURL(require('path').resolve(__dirname, '../../../compat/driver.mjs')).href);
+  const { runSetup } = await import(require('url').pathToFileURL(require('path').resolve(__dirname, '../compat/driver.mjs')).href);
   const ok = await runSetup(SETUP, { host: '127.0.0.1', port: String(port), password: 'pw' });
   assert.ok(ok.ok, ok.output);
   assert.match(ok.env, new RegExp(`VSCODE_PORT=${port}`));

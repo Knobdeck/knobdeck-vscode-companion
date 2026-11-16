@@ -1,0 +1,5 @@
+node_modules/
+.vscode-test/
+*.vsix
+test/e2e/workspace/out/*.marker
+.DS_Store

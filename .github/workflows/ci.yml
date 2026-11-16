@@ -1,0 +1,70 @@
+name: CI
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+  workflow_dispatch:
+    inputs:
+      plugins_ref:
+        description: knobdeck-plugins branch or tag to test against
+        default: master
+  workflow_call:
+
+jobs:
+  test:
+    name: Test (${{ matrix.os }})
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      # The KnobDeck `vscode` plugin, built from source, so the tests drive the real thing.
+      - uses: actions/checkout@v4
+        with:
+          repository: Knobdeck/knobdeck-plugins
+          ref: ${{ inputs.plugins_ref || 'master' }}
+          path: knobdeck-plugins
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: knobdeck-plugins
+      - name: Build the KnobDeck vscode plugin
+        working-directory: knobdeck-plugins
+        run: cargo build --release -p vscode
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Unit and plugin tests
+        shell: bash
+        run: |
+          bin="$GITHUB_WORKSPACE/knobdeck-plugins/target/release"
+          ext=""; [ "$RUNNER_OS" = Windows ] && ext=".exe"
+          KNOBDECK_VSCODE_PLUGIN="$bin/vscode$ext" KNOBDECK_VSCODE_SETUP="$bin/vscode-setup$ext" npm test
+      - name: End-to-end in VS Code
+        shell: bash
+        run: |
+          bin="$GITHUB_WORKSPACE/knobdeck-plugins/target/release"
+          ext=""; [ "$RUNNER_OS" = Windows ] && ext=".exe"
+          export KNOBDECK_VSCODE_PLUGIN="$bin/vscode$ext"
+          if [ "$RUNNER_OS" = Linux ]; then xvfb-run -a npm run test:e2e; else npm run test:e2e; fi
+
+  package:
+    needs: test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npx vsce package --skip-license -o knobdeck-vscode-companion.vsix
+      - uses: actions/upload-artifact@v4
+        with:
+          name: knobdeck-vscode-companion
+          path: knobdeck-vscode-companion.vsix

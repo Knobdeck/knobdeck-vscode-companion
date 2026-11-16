@@ -2,3 +2,5 @@ test/**
 .vscode-test/**
 *.vsix
 .gitignore
+.github/**
+CONTRIBUTING.md

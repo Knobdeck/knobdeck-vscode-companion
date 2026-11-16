@@ -1,0 +1,55 @@
+# Push a tag v<version> (matching package.json) to test, build and publish a release.
+#
+# Publishing uses Trusted Publishing (OIDC): no store tokens are stored in this repo. Both stores
+# trust this file by name (release.yml) in the `release` environment, so keep the two in step
+# with the policies on marketplace.visualstudio.com/manage and open-vsx.org.
+name: Release
+
+on:
+  push:
+    tags: ["v*"]
+
+jobs:
+  ci:
+    uses: ./.github/workflows/ci.yml
+
+  publish:
+    needs: ci
+    runs-on: ubuntu-latest
+    environment: release
+    permissions:
+      contents: write # GitHub release
+      id-token: write # OIDC token for the Marketplace and Open VSX
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Check the tag matches package.json
+        run: test "v$(node -p 'require("./package.json").version')" = "$GITHUB_REF_NAME"
+      - uses: actions/download-artifact@v4
+        with:
+          name: knobdeck-vscode-companion
+      - name: Visual Studio Marketplace
+        run: npx vsce publish --oidc --skip-duplicate --packagePath knobdeck-vscode-companion.vsix
+      - name: Open VSX
+        # Open VSX trusts this workflow only once the extension has one version there, so the very
+        # first upload needs a token: set the OVSX_PAT secret for that, then delete it.
+        env:
+          OVSX_PAT: ${{ secrets.OVSX_PAT }}
+        run: |
+          if [ -n "$OVSX_PAT" ]; then
+            npx ovsx publish knobdeck-vscode-companion.vsix --skip-duplicate
+          else
+            unset OVSX_PAT
+            npx ovsx publish knobdeck-vscode-companion.vsix --skip-duplicate --trusted-publishing
+          fi
+      - name: GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          awk '/^## /{n++} n==1' CHANGELOG.md | tail -n +2 > notes.md
+          gh release create "$GITHUB_REF_NAME" knobdeck-vscode-companion.vsix \
+            --title "KnobDeck VS Code Companion ${GITHUB_REF_NAME#v}" --notes-file notes.md

@@ -147,7 +147,7 @@ const PLUGIN = process.env.KNOBDECK_VSCODE_PLUGIN;
 
 test('KnobDeck plugin: simple actions', async () => {
   if (!PLUGIN) return 'skipped (no KNOBDECK_VSCODE_PLUGIN)';
-  const { PluginDriver } = await import(pathToFileURL(path.resolve(__dirname, '../../../compat/driver.mjs')).href);
+  const { PluginDriver } = await import(pathToFileURL(path.resolve(__dirname, '../compat/driver.mjs')).href);
   const plugin = await PluginDriver.start(PLUGIN, { VSCODE_PORT: String(PORT) });
   try {
     for (const id of ['explorer', 'search', 'source-control', 'problems', 'toggle-panel', 'toggle-panel', 'save-all', 'split-editor', 'new-terminal']) {
