@@ -2,7 +2,7 @@
   "name": "knobdeck-vscode-companion",
   "displayName": "KnobDeck VS Code Companion",
   "description": "Lets the KnobDeck dial and deck control VS Code: run tasks, start debugging, switch editors and terminals, and run any command.",
-  "version": "1.1.1",
+  "version": "1.2.0",
   "publisher": "knobdeck",
   "author": "Harshal Kudale",
   "license": "MIT",

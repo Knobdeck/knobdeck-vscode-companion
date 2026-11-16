@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.2.0
+
+- Released from the new one-click release workflow (tests on Linux and Windows, then the Visual
+  Studio Marketplace and Open VSX). No changes to the extension.
+
 ## 1.1.1
 
 - Licensed under MIT (needed to publish on Open VSX). No changes to the extension.
