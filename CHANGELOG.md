@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.1.1
+
+- Licensed under MIT (needed to publish on Open VSX). No changes to the extension.
+
 ## 1.1.0
 
 - Links to KnobDeck through its **companion hub**: every window links on its own and reports when

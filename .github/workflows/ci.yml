@@ -65,7 +65,7 @@ jobs:
           node-version: 22
           cache: npm
       - run: npm ci
-      - run: npx vsce package --skip-license -o knobdeck-vscode-companion.vsix
+      - run: npx vsce package -o knobdeck-vscode-companion.vsix
       - uses: actions/upload-artifact@v4
         with:
           name: knobdeck-vscode-companion

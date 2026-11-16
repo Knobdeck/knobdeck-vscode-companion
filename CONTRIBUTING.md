@@ -13,7 +13,7 @@ Node 20+:
 npm ci
 npm test                       # protocol tests with a stand-in vscode module
 npm run test:e2e               # in a real VS Code (downloads it; needs a display)
-npx vsce package --skip-license
+npx vsce package
 ```
 
 Point `KNOBDECK_VSCODE_PLUGIN` / `KNOBDECK_VSCODE_SETUP` at a built `vscode` / `vscode-setup` from

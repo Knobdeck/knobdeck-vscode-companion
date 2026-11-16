@@ -2,9 +2,10 @@
   "name": "knobdeck-vscode-companion",
   "displayName": "KnobDeck VS Code Companion",
   "description": "Lets the KnobDeck dial and deck control VS Code: run tasks, start debugging, switch editors and terminals, and run any command.",
-  "version": "1.1.0",
+  "version": "1.1.1",
   "publisher": "knobdeck",
   "author": "Harshal Kudale",
+  "license": "MIT",
   "icon": "media/icon.png",
   "galleryBanner": {
     "color": "#12161A",
@@ -106,7 +107,7 @@
   "scripts": {
     "test": "node --test test/unit/*.test.js",
     "test:e2e": "node test/e2e/run.js",
-    "package": "vsce package --skip-license"
+    "package": "vsce package"
   },
   "devDependencies": {
     "@vscode/test-electron": "3.1.0",
