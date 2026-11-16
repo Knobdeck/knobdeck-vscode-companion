@@ -2,7 +2,7 @@
   "name": "knobdeck-vscode-companion",
   "displayName": "KnobDeck VS Code Companion",
   "description": "Lets the KnobDeck dial and deck control VS Code: run tasks, start debugging, switch editors and terminals, and run any command.",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "publisher": "knobdeck",
   "author": "Harshal Kudale",
   "icon": "media/icon.png",
@@ -49,12 +49,12 @@
     "commands": [
       {
         "command": "knobdeck.startServer",
-        "title": "Connect This Window to KnobDeck",
+        "title": "Link This Window to KnobDeck",
         "category": "KnobDeck"
       },
       {
         "command": "knobdeck.stopServer",
-        "title": "Stop the Action Server",
+        "title": "Unlink This Window from KnobDeck",
         "category": "KnobDeck"
       },
       {
@@ -78,21 +78,28 @@
           "maximum": 65535,
           "scope": "application",
           "order": 0,
-          "markdownDescription": "Port of the local action server (on `127.0.0.1` only). Use the same port in KnobDeck's VS Code plugin setup."
+          "markdownDescription": "Port of the action server for **older KnobDeck versions** (on `127.0.0.1` only; see *Legacy Server*). Current KnobDeck links through its companion hub and needs no port."
         },
         "knobdeck.password": {
           "type": "string",
           "default": "",
           "scope": "application",
           "order": 1,
-          "markdownDescription": "Optional password. When set, KnobDeck must send the same password; enter it in KnobDeck's VS Code plugin setup."
+          "markdownDescription": "Optional password for the action server for **older KnobDeck versions**. Current KnobDeck links through its companion hub, which needs no password."
         },
         "knobdeck.autostart": {
           "type": "boolean",
           "default": true,
           "scope": "application",
           "order": 2,
-          "description": "Start the action server when VS Code starts."
+          "description": "Link to KnobDeck when VS Code starts."
+        },
+        "knobdeck.legacyServer": {
+          "type": "boolean",
+          "default": true,
+          "scope": "application",
+          "order": 3,
+          "markdownDescription": "Also run the local HTTP action server for KnobDeck versions without the companion hub. Turn it off once KnobDeck is up to date."
         }
       }
     }
@@ -100,11 +107,15 @@
   "scripts": {
     "test": "node --test test/unit/*.test.js",
     "test:e2e": "node test/e2e/run.js",
-    "package": "vsce package --no-dependencies --skip-license"
+    "package": "vsce package --skip-license"
   },
   "devDependencies": {
     "@vscode/test-electron": "3.1.0",
     "@vscode/vsce": "4.1.1",
     "ovsx": "1.4.0"
+  },
+  "dependencies": {
+    "@knobdeck/companion": "0.2.0",
+    "ws": "8.22.1"
   }
 }

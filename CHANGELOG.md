@@ -1,5 +1,13 @@
 # Changelog
 
+## 1.1.0
+
+- Links to KnobDeck through its **companion hub**: every window links on its own and reports when
+  it gains focus, so KnobDeck drives the window you used last. No port and no password; the link
+  re-reads KnobDeck's discovery file, so it survives KnobDeck restarts.
+- The HTTP action server stays for older KnobDeck versions (`knobdeck.legacyServer`, on by default).
+- Status bar and **KnobDeck: Link / Unlink This Window** cover both.
+
 ## 1.0.0
 
 - First release as **KnobDeck VS Code Companion**.

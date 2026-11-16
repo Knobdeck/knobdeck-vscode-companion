@@ -18,19 +18,23 @@ buttons work whatever your keybindings are, and VS Code doesn't need to be focus
 
 ## Setup
 
-1. Install this extension. Its action server starts on `127.0.0.1:32145`, and the status bar shows
-   **KnobDeck**.
-2. Optional: set a password under **Settings → Extensions → KnobDeck VS Code Companion**.
-3. In KnobDeck, install the **VS Code** plugin and enter the same port and password in its setup.
+1. Install this extension and, in KnobDeck, the **VS Code** plugin.
+2. That's it: each VS Code window links to KnobDeck by itself (through KnobDeck's companion hub,
+   on `127.0.0.1`), and the status bar shows **KnobDeck** with a broadcast icon once linked. No port
+   or password to set; the link survives KnobDeck restarts.
+
+**Older KnobDeck versions** (without the companion hub) reach the extension's HTTP action server on
+`127.0.0.1:32145` instead; enter its port and optional password in the plugin's setup. Turn
+`knobdeck.legacyServer` off once KnobDeck is up to date.
 
 To find a command ID for **Custom Command**, run **KnobDeck: Copy a Command ID** from the Command
 Palette.
 
 ### Several windows
 
-Every VS Code window runs the extension, but only one can hold the port. KnobDeck controls the
-window you used last: when you focus another window, it takes over. The status bar shows
-**KnobDeck** with a broadcast icon in the connected window, and a disconnected icon in the others.
+Every VS Code window links to KnobDeck on its own, and tells KnobDeck when it gains focus, so
+KnobDeck controls the window you used last. (With an older KnobDeck, only one window can hold the
+HTTP port; focusing another window hands it over.)
 
 ### Remote windows
 
@@ -41,22 +45,27 @@ KnobDeck, so nothing needs forwarding.
 
 | Setting | Default | |
 |---|---|---|
-| `knobdeck.port` | `32145` | Port of the action server. |
-| `knobdeck.password` | empty | KnobDeck must send this password. |
-| `knobdeck.autostart` | `true` | Start the server when VS Code starts. |
+| `knobdeck.autostart` | `true` | Link to KnobDeck when VS Code starts. |
+| `knobdeck.legacyServer` | `true` | Also run the HTTP action server for older KnobDeck versions. |
+| `knobdeck.port` | `32145` | Port of that action server. |
+| `knobdeck.password` | empty | Password for that action server. |
 
 ## Privacy and security
 
-The extension sends nothing anywhere and collects no data. Its server listens only on `127.0.0.1`,
-so other computers can't reach it. It also refuses requests from web pages, so a website you visit
+The extension sends nothing anywhere and collects no data. It talks only to KnobDeck on your own
+computer: the hub link goes to `127.0.0.1` with a token only your user can read, and its server
+listens only on `127.0.0.1`, so other computers can't reach it. It also refuses requests from web pages, so a website you visit
 can't drive your editor. See the [KnobDeck privacy policy](https://knobdeck.harshalkudale.com/legal/privacy).
 
 ## Commands
 
-- **KnobDeck: Connect This Window to KnobDeck**
-- **KnobDeck: Stop the Action Server**
+- **KnobDeck: Link This Window to KnobDeck**
+- **KnobDeck: Unlink This Window from KnobDeck**
 - **KnobDeck: Show Connection Status**
 - **KnobDeck: Copy a Command ID**
 
-The HTTP interface is documented in
+The hub link uses KnobDeck's companion protocol
+([REFERENCE.md](https://github.com/Knobdeck/knobdeck-sdk/blob/master/knobdeck-protocol/REFERENCE.md),
+via [`@knobdeck/companion`](https://www.npmjs.com/package/@knobdeck/companion)); the HTTP interface
+for older KnobDeck versions is in
 [PROTOCOL.md](https://github.com/Knobdeck/knobdeck-companion/blob/master/PROTOCOL.md).

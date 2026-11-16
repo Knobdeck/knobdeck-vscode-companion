@@ -3,10 +3,13 @@
 const vscode = require('vscode');
 const server = require('./server');
 const { QUERIES, SIMPLE_COMMANDS, PARAM_COMMANDS, runAction } = require('./actions');
+const { createHubLink } = require('./hub');
 
-// One action server per machine, on one port: every VS Code window runs this extension, so the
-// window that holds the port is the one KnobDeck controls. When another window gains focus it asks
-// the holder to hand the port over, so KnobDeck always drives the window you last used.
+// Two ways KnobDeck reaches this window:
+// - The companion hub (current KnobDeck): every window keeps its own link to KnobDeck and reports
+//   when it gains focus, so KnobDeck drives the window you last used. No port, no password.
+// - The legacy HTTP action server (KnobDeck versions without the hub), on by `knobdeck.legacyServer`:
+//   one server per machine on one port; a window that gains focus asks the holder to hand it over.
 
 const RETRY_MS = 15000;
 
@@ -19,6 +22,10 @@ let retryTimer = null;
 let statusItem = null;
 let busy = Promise.resolve();
 let version = '';
+/** @type {Awaited<ReturnType<typeof createHubLink>> | null} */
+let hub = null;
+/** @type {{state: string, link?: string, reason?: string}} */
+let hubStatus = { state: 'disconnected' };
 
 function config() {
   const c = vscode.workspace.getConfiguration('knobdeck');
@@ -26,6 +33,7 @@ function config() {
     port: Number(c.get('port', 32145)),
     password: String(c.get('password', '')),
     autostart: Boolean(c.get('autostart', true)),
+    legacyServer: Boolean(c.get('legacyServer', true)),
   };
 }
 
@@ -45,18 +53,31 @@ function setState(next, error = '') {
   renderStatus();
 }
 
+/** One line about the hub link, for the tooltip and the options menu. */
+function hubLine() {
+  return {
+    connected: `Linked to KnobDeck (${hubStatus.link}).`,
+    connecting: 'Waiting for KnobDeck to start.',
+    refused: `KnobDeck refused the link: ${hubStatus.reason}`,
+    disconnected: 'Not linked to KnobDeck.',
+  }[hubStatus.state] || 'Not linked to KnobDeck.';
+}
+
 function renderStatus() {
   if (!statusItem) return;
   const port = config().port;
-  const look = {
-    serving: ['$(radio-tower) KnobDeck', `KnobDeck is controlling this window (127.0.0.1:${port}).`],
-    standby: ['$(debug-disconnect) KnobDeck', 'Another VS Code window is connected to KnobDeck. Focus this window to switch.'],
-    stopped: ['$(circle-slash) KnobDeck', 'The KnobDeck action server is off.'],
-    error: ['$(warning) KnobDeck', `KnobDeck action server: ${lastError}`],
+  const legacy = {
+    serving: `Older KnobDeck versions: serving on 127.0.0.1:${port}.`,
+    standby: 'Older KnobDeck versions: another window holds the port.',
+    stopped: '',
+    error: `Older KnobDeck versions: ${lastError}`,
   }[state];
-  statusItem.text = look[0];
-  statusItem.tooltip = `${look[1]}\nClick for options.`;
-  statusItem.backgroundColor = state === 'error' ? new vscode.ThemeColor('statusBarItem.warningBackground') : undefined;
+  const linked = hubStatus.state === 'connected';
+  // The hub link is what current KnobDeck uses; the legacy server only matters without it.
+  const icon = linked || state === 'serving' ? '$(radio-tower)' : state === 'error' || hubStatus.state === 'refused' ? '$(warning)' : '$(debug-disconnect)';
+  statusItem.text = `${icon} KnobDeck`;
+  statusItem.tooltip = [hubLine(), legacy, 'Click for options.'].filter(Boolean).join('\n');
+  statusItem.backgroundColor = !linked && (state === 'error' || hubStatus.state === 'refused') ? new vscode.ThemeColor('statusBarItem.warningBackground') : undefined;
   statusItem.show();
 }
 
@@ -138,20 +159,22 @@ function stop() {
 }
 
 async function showStatus() {
-  const { port } = config();
+  const { port, legacyServer } = config();
   const items = [];
-  if (state === 'serving') items.push({ label: '$(debug-stop) Stop the action server', run: () => stop() });
-  else items.push({ label: '$(play) Connect this window to KnobDeck', run: () => start(true) });
+  if (hub && hubStatus.state !== 'disconnected') items.push({ label: '$(debug-disconnect) Unlink this window from KnobDeck', run: () => stopAll() });
+  else items.push({ label: '$(plug) Link this window to KnobDeck', run: () => startAll(true) });
+  if (legacyServer) {
+    if (state === 'serving') items.push({ label: '$(debug-stop) Stop the server for older KnobDeck versions', run: () => stop() });
+    else items.push({ label: '$(play) Serve older KnobDeck versions from this window', run: () => start(true) });
+  }
   items.push(
     { label: '$(list-flat) Browse command IDs', run: () => browseCommands() },
     { label: '$(gear) Open companion settings', run: () => vscode.commands.executeCommand('workbench.action.openSettings', '@ext:knobdeck.knobdeck-vscode-companion') }
   );
-  const placeHolder = {
-    serving: `Connected: KnobDeck controls this window on 127.0.0.1:${port}`,
-    standby: `Standby: another VS Code window holds port ${port}`,
-    stopped: 'Stopped',
-    error: `Error: ${lastError}`,
-  }[state];
+  const legacy = legacyServer
+    ? { serving: ` · older versions: 127.0.0.1:${port}`, standby: ' · older versions: another window', stopped: '', error: ` · older versions: ${lastError}` }[state]
+    : '';
+  const placeHolder = `${hubLine()}${legacy}`;
   const pick = await vscode.window.showQuickPick(items, { placeHolder, title: 'KnobDeck VS Code Companion' });
   if (pick) await pick.run();
 }
@@ -173,7 +196,23 @@ async function browseCommands() {
   vscode.window.showInformationMessage(`Copied "${pick.label}".`);
 }
 
-function activate(context) {
+/** Link to the hub and, if enabled, serve older KnobDeck versions. */
+function startAll(takeOver) {
+  if (hub) hub.start();
+  if (config().legacyServer) return start(takeOver);
+  return Promise.resolve();
+}
+
+function stopAll() {
+  if (hub) hub.stop();
+  return stop();
+}
+
+function workspaceName() {
+  return vscode.workspace.name || (vscode.workspace.workspaceFolders || [])[0]?.name || 'no folder';
+}
+
+async function activate(context) {
   version = context.extension.packageJSON.version;
   statusItem = vscode.window.createStatusBarItem('knobdeck.status', vscode.StatusBarAlignment.Right, 100);
   statusItem.name = 'KnobDeck';
@@ -182,29 +221,52 @@ function activate(context) {
 
   context.subscriptions.push(
     statusItem,
-    vscode.commands.registerCommand('knobdeck.startServer', () => start(true)),
-    vscode.commands.registerCommand('knobdeck.stopServer', () => stop()),
+    vscode.commands.registerCommand('knobdeck.startServer', () => startAll(true)),
+    vscode.commands.registerCommand('knobdeck.stopServer', () => stopAll()),
     vscode.commands.registerCommand('knobdeck.showStatus', () => showStatus()),
     vscode.commands.registerCommand('knobdeck.browseCommands', () => browseCommands()),
     vscode.window.onDidChangeWindowState((s) => {
-      if (s.focused && state === 'standby') start(true);
+      if (!s.focused) return;
+      if (hub) hub.focused();
+      if (state === 'standby' && config().legacyServer) start(true);
     }),
     vscode.workspace.onDidChangeConfiguration((e) => {
       if (!e.affectsConfiguration('knobdeck')) return;
       const { autostart } = config();
-      if (e.affectsConfiguration('knobdeck.port') && state !== 'stopped') start(vscode.window.state.focused);
-      else if (e.affectsConfiguration('knobdeck.autostart') && autostart && state === 'stopped') start(vscode.window.state.focused);
+      if (e.affectsConfiguration('knobdeck.legacyServer')) {
+        if (config().legacyServer && autostart) start(vscode.window.state.focused);
+        else if (!config().legacyServer) stop();
+      } else if (e.affectsConfiguration('knobdeck.port') && state !== 'stopped') start(vscode.window.state.focused);
+      else if (e.affectsConfiguration('knobdeck.autostart') && autostart && state === 'stopped') startAll(vscode.window.state.focused);
       else renderStatus();
     }),
-    { dispose: () => { clearTimeout(retryTimer); closeInstance(); } }
+    { dispose: () => { clearTimeout(retryTimer); closeInstance(); if (hub) hub.stop(); } }
   );
 
-  if (config().autostart) start(vscode.window.state.focused);
-  return { state: () => state };
+  try {
+    hub = await createHubLink({
+      instance: vscode.env.sessionId,
+      name: `${vscode.env.appName} — ${workspaceName()}`,
+      appVersion: vscode.version,
+      version,
+      isFocused: () => vscode.window.state.focused,
+      onStatus: (s) => {
+        hubStatus = s;
+        renderStatus();
+      },
+    });
+  } catch (error) {
+    hubStatus = { state: 'refused', reason: `the companion client failed to load (${error.message})` };
+  }
+
+  if (config().autostart) startAll(vscode.window.state.focused);
+  else renderStatus();
+  return { state: () => state, hubStatus: () => hubStatus };
 }
 
 function deactivate() {
   clearTimeout(retryTimer);
+  if (hub) hub.stop();
   return closeInstance();
 }
 

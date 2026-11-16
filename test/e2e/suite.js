@@ -56,6 +56,93 @@ test('queries over HTTP', async () => {
   assert.deepEqual((await get('/api/query/launch-configs')).body.items, [{ value: 'kd-debug', label: 'kd-debug' }]);
 });
 
+// ---- the companion hub ------------------------------------------------------------------------
+// A fake KnobDeck hub inside this process: the real extension links to it through the discovery
+// file named by KNOBDECK_COMPANION_DISCOVERY, as it does to KnobDeck's.
+
+const { WebSocketServer } = require(path.join(__dirname, '../../node_modules/ws'));
+
+function startFakeHub(token) {
+  const wss = new WebSocketServer({ host: '127.0.0.1', port: 0 });
+  const hub = { frames: [], socket: null, wss, refused: 0 };
+  wss.on('connection', (ws) => {
+    ws.on('message', (data) => {
+      const msg = JSON.parse(String(data));
+      hub.frames.push(msg);
+      if (msg.type === 'hello') {
+        if (msg.token !== token) {
+          hub.refused++;
+          ws.send(JSON.stringify({ type: 'refused', reason: 'wrong token' }));
+          ws.close();
+          return;
+        }
+        hub.socket = ws;
+        ws.send(JSON.stringify({ type: 'ready', protocol: 1, link: 'vscode-1', host_version: 'e2e' }));
+      }
+    });
+  });
+  return new Promise((resolve) => wss.on('listening', () => resolve(hub)));
+}
+
+function writeDiscovery(port, token) {
+  fs.writeFileSync(process.env.KNOBDECK_COMPANION_DISCOVERY, JSON.stringify({ protocol: 1, port, path: '/companion', token }));
+}
+
+let nextId = 1;
+async function ask(hub, action, params = {}) {
+  const id = String(nextId++);
+  hub.socket.send(JSON.stringify({ type: 'request', id, action, params }));
+  let answer;
+  await until(`answer ${id}`, () => (answer = hub.frames.find((f) => f.type === 'response' && f.id === id)));
+  return answer;
+}
+
+test('hub: links, reports focus, runs actions and queries', async () => {
+  const hub = await startFakeHub('tok-1');
+  writeDiscovery(hub.wss.address().port, 'tok-1');
+  // Link now instead of waiting for the next retry.
+  await vscode.commands.executeCommand('knobdeck.stopServer');
+  await vscode.commands.executeCommand('knobdeck.startServer');
+  await until('hello', () => hub.socket);
+  const hello = hub.frames.find((f) => f.type === 'hello');
+  assert.equal(hello.plugin, `vscode-${{ darwin: 'macos', win32: 'windows' }[process.platform] || process.platform}`);
+  assert.equal(hello.app, 'vscode');
+  assert.equal(hello.instance, vscode.env.sessionId);
+  assert.ok(hello.name.endsWith('— workspace'), hello.name);
+  const ext = vscode.extensions.getExtension('knobdeck.knobdeck-vscode-companion');
+  await until('linked status', () => ext.exports.hubStatus().state === 'connected');
+
+  const tasks = await ask(hub, 'query', { name: 'tasks' });
+  assert.ok(tasks.result.items.some((i) => i.value === 'kd-touch'), JSON.stringify(tasks));
+
+  if (fs.existsSync(marker('task.marker'))) fs.rmSync(marker('task.marker'));
+  const ran = await ask(hub, 'vscode.runTask', { name: 'kd-touch' });
+  assert.equal(ran.ok, true, JSON.stringify(ran));
+  await until('task marker (hub)', () => fs.existsSync(marker('task.marker')));
+  await until('task run to end', () => !vscode.tasks.taskExecutions.some((e) => e.task.name === 'kd-touch'));
+  fs.rmSync(marker('task.marker'));
+
+  const missing = await ask(hub, 'vscode.runTask', { name: 'nope' });
+  assert.deepEqual([missing.ok, missing.error], [false, 'Task "nope" was not found.']);
+
+  // Custom Command: a VS Code command id that isn't one of ours.
+  const custom = await ask(hub, 'workbench.action.files.saveAll');
+  assert.equal(custom.ok, true, JSON.stringify(custom));
+  const unknown = await ask(hub, 'no.such.command.kd');
+  assert.equal(unknown.error, 'VS Code has no command "no.such.command.kd".');
+
+  // KnobDeck restarts: new token, new port. The extension re-reads the file and links again.
+  for (const c of hub.wss.clients) c.terminate();
+  hub.wss.close();
+  const hub2 = await startFakeHub('tok-2');
+  writeDiscovery(hub2.wss.address().port, 'tok-2');
+  await until('re-link after a KnobDeck restart', () => hub2.socket, 45000);
+  assert.equal(hub2.refused, 0);
+  assert.equal((await ask(hub2, 'query', { name: 'launch-configs' })).result.items[0].value, 'kd-debug');
+  for (const c of hub2.wss.clients) c.terminate();
+  hub2.wss.close();
+});
+
 const PLUGIN = process.env.KNOBDECK_VSCODE_PLUGIN;
 
 test('KnobDeck plugin: simple actions', async () => {
