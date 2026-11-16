@@ -39,9 +39,13 @@ jobs:
         run: |
           tag="v$VERSION"
           if gh release view "$tag" >/dev/null 2>&1; then
-            test "$(gh api "repos/$GITHUB_REPOSITORY/commits/$tag" --jq .sha)" = "$GITHUB_SHA" \
-              || { echo "::error::$tag already exists on another commit: bump the version in package.json"; exit 1; }
-            echo "::notice::$tag is already released; publishing to the stores only"
+            released=$(gh api "repos/$GITHUB_REPOSITORY/commits/$tag" --jq .sha)
+            if [ "$released" != "$GITHUB_SHA" ]; then
+              # A retry after a workflow fix lands here too, so don't fail: the stores skip what they have.
+              echo "::warning::$tag was released from ${released:0:7}, not this commit. Nothing new ships unless you bump the version in package.json; retrying the stores for $tag only."
+            else
+              echo "::notice::$tag is already released; retrying the stores only"
+            fi
             exit 0
           fi
           awk '/^## /{n++} n==1' CHANGELOG.md | tail -n +2 > notes.md
@@ -84,4 +88,14 @@ jobs:
         with:
           name: knobdeck-vscode-companion
       - name: Open VSX
-        run: npx ovsx publish knobdeck-vscode-companion.vsix --skip-duplicate --trusted-publishing
+        # Trusted publishing once the publisher registered at open-vsx.org matches this workflow;
+        # until then (and while it is set) the OVSX_PAT secret is used.
+        env:
+          OVSX_PAT: ${{ secrets.OVSX_PAT }}
+        run: |
+          if [ -n "$OVSX_PAT" ]; then
+            npx ovsx publish knobdeck-vscode-companion.vsix --skip-duplicate
+          else
+            unset OVSX_PAT
+            npx ovsx publish knobdeck-vscode-companion.vsix --skip-duplicate --trusted-publishing
+          fi
