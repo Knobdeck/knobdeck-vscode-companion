@@ -25,6 +25,8 @@ jobs:
     environment: release
     permissions:
       contents: write # tag and GitHub release
+    outputs:
+      version: ${{ steps.version.outputs.version }}
     steps:
       - uses: actions/checkout@v4
       - id: version
@@ -99,3 +101,30 @@ jobs:
             unset OVSX_PAT
             npx ovsx publish knobdeck-vscode-companion.vsix --skip-duplicate --trusted-publishing
           fi
+
+  catalog:
+    # Tells the knobdeck-registry catalog to rebuild. Skipped until the catalog GitHub App is set up
+    # (CATALOG_APP_ID variable, CATALOG_APP_PRIVATE_KEY secret). Runs even when a store job failed,
+    # because the GitHub release already exists.
+    needs: [release, marketplace, open-vsx]
+    if: ${{ !cancelled() && needs.release.result == 'success' }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Catalog app token
+        id: app
+        if: vars.CATALOG_APP_ID != ''
+        uses: actions/create-github-app-token@v1
+        with:
+          app-id: ${{ vars.CATALOG_APP_ID }}
+          private-key: ${{ secrets.CATALOG_APP_PRIVATE_KEY }}
+          owner: Knobdeck
+          repositories: knobdeck-registry
+      - name: Tell the catalog
+        if: steps.app.outputs.token != ''
+        env:
+          GH_TOKEN: ${{ steps.app.outputs.token }}
+          VERSION: ${{ needs.release.outputs.version }}
+        run: |
+          jq -n --arg repo "$GITHUB_REPOSITORY" --arg id "vscode" --arg version "$VERSION" \
+            '{event_type: "companion-released", client_payload: {repo: $repo, id: $id, version: $version}}' |
+            gh api repos/Knobdeck/knobdeck-registry/dispatches --input -
