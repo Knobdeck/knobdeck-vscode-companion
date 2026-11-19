@@ -24,8 +24,9 @@ them in both test runs. CI does this on Linux and Windows (and macOS on pull req
 
 ## Releasing
 
-1. Bump `version` in `package.json` and add a `CHANGELOG.md` entry. Merge to `master`.
-2. **Actions → Release → Run workflow** on `master`.
+1. Bump `version` in `package.json` and add a `CHANGELOG.md` entry. Merge to `master`; that
+   starts the Release workflow, which ships the new version. A push that doesn't bump the version
+   only runs CI. To retry the stores for a released version, use **Actions → Release → Run workflow** on `master`.
 
 `.github/workflows/release.yml` runs the tests (Linux and Windows), packages the `.vsix`, creates
 the tag `v<version>` and a GitHub release with it, then publishes it to the Visual Studio
