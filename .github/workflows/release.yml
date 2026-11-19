@@ -1,6 +1,7 @@
-# Actions → Release → Run workflow (on master) releases the version in package.json: it runs CI,
+# Every push to master runs this. When the version in package.json has no release yet, it runs CI,
 # creates the tag v<version> and a GitHub release with the .vsix, then publishes it to the Visual
-# Studio Marketplace and Open VSX. Re-running for a version that already has a release skips the
+# Studio Marketplace and Open VSX. A push that doesn't bump the version only runs CI.
+# Actions → Release → Run workflow on master for a version that already has a release skips the
 # release and only retries the stores (both skip a version they already have).
 #
 # Publishing uses Trusted Publishing (OIDC): no store tokens are stored in this repo. Both stores
@@ -10,6 +11,8 @@
 name: Release
 
 on:
+  push:
+    branches: [master]
   workflow_dispatch:
 
 concurrency: release
@@ -27,6 +30,7 @@ jobs:
       contents: write # tag and GitHub release
     outputs:
       version: ${{ steps.version.outputs.version }}
+      publish: ${{ steps.tag.outputs.publish }}
     steps:
       - uses: actions/checkout@v4
       - id: version
@@ -35,12 +39,18 @@ jobs:
         with:
           name: knobdeck-vscode-companion
       - name: Tag and GitHub release
+        id: tag
         env:
           GH_TOKEN: ${{ github.token }}
           VERSION: ${{ steps.version.outputs.version }}
         run: |
           tag="v$VERSION"
           if gh release view "$tag" >/dev/null 2>&1; then
+            if [ "$GITHUB_EVENT_NAME" = push ]; then
+              echo "::notice::$tag is already released; bump the version in package.json to ship this push"
+              exit 0
+            fi
+            echo "publish=true" >> "$GITHUB_OUTPUT"
             released=$(gh api "repos/$GITHUB_REPOSITORY/commits/$tag" --jq .sha)
             if [ "$released" != "$GITHUB_SHA" ]; then
               # A retry after a workflow fix lands here too, so don't fail: the stores skip what they have.
@@ -53,9 +63,11 @@ jobs:
           awk '/^## /{n++} n==1' CHANGELOG.md | tail -n +2 > notes.md
           gh release create "$tag" knobdeck-vscode-companion.vsix --target "$GITHUB_SHA" \
             --title "KnobDeck VS Code Companion $VERSION" --notes-file notes.md
+          echo "publish=true" >> "$GITHUB_OUTPUT"
 
   marketplace:
     needs: release
+    if: needs.release.outputs.publish == 'true'
     runs-on: ubuntu-latest
     environment: release
     permissions:
@@ -75,6 +87,7 @@ jobs:
 
   open-vsx:
     needs: release
+    if: needs.release.outputs.publish == 'true'
     runs-on: ubuntu-latest
     environment: release
     permissions:
@@ -107,7 +120,7 @@ jobs:
     # (CATALOG_APP_ID variable, CATALOG_APP_PRIVATE_KEY secret). Runs even when a store job failed,
     # because the GitHub release already exists.
     needs: [release, marketplace, open-vsx]
-    if: ${{ !cancelled() && needs.release.result == 'success' }}
+    if: ${{ !cancelled() && needs.release.result == 'success' && needs.release.outputs.publish == 'true' }}
     runs-on: ubuntu-latest
     steps:
       - name: Catalog app token

@@ -1,8 +1,7 @@
 name: CI
 
+# Pushes to master run this through the Release workflow (release.yml), not on their own.
 on:
-  push:
-    branches: [master]
   pull_request:
   workflow_dispatch:
     inputs:
@@ -19,7 +18,7 @@ jobs:
       matrix:
         # macOS runners often queue for a long time, so macOS runs only on pull requests and on a
         # manual CI run (Actions → CI → Run workflow), never in a release. Inside a release this
-        # workflow sees the Release run's event (workflow_dispatch), hence the workflow-name check.
+        # workflow sees the Release run's event (push or workflow_dispatch), hence the workflow-name check.
         os: ${{ fromJSON((github.event_name == 'pull_request' || (github.event_name == 'workflow_dispatch' && github.workflow == 'CI')) && '["ubuntu-latest", "windows-latest", "macos-latest"]' || '["ubuntu-latest", "windows-latest"]') }}
     runs-on: ${{ matrix.os }}
     steps:
