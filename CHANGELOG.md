@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.2.1
+
+- Build tooling only: the packager's glob matcher (minimatch) updated for a security advisory. No changes to
+  the extension.
+
 ## 1.2.0
 
 - Released from the new one-click release workflow (tests on Linux and Windows, then the Visual
